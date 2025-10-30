@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>粒子聚合文字动画</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-family: 'STXingkai', '华文行楷', cursive;
+        }
+        #final-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            color: #FFB6C1;
+            font-size: 3rem;
+            text-shadow: 0 0 20px #FF69B4, 0 0 40px #FF69B4;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 2s ease-in-out;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        #final-text.show {
+            opacity: 1;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="final-text">祝廖盈盈万事如意</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// 星云粒子系统
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// 创建粒子系统
+const particlesGeometry = new THREE.BufferGeometry();
+const particleCount = 15000;
+const posArray = new Float32Array(particleCount * 3);
+const colorArray = new Float32Array(particleCount * 3);
+
+// 存储粒子的初始位置和目标位置
+const initialPositions = [];
+
+// 初始化粒子位置
+for(let i = 0; i < particleCount * 3; i += 3) {
+    // 初始位置 - 随机分布在场景中
+    posArray[i] = (Math.random() - 0.5) * 20;
+    posArray[i+1] = (Math.random() - 0.5) * 20;
+    posArray[i+2] = (Math.random() - 0.5) * 8;
+
+    // 存储初始位置
+    initialPositions.push(
+        posArray[i],
+        posArray[i+1],
+        posArray[i+2]
+    );
+
+    // 颜色 - 保持原来的颜色
+    colorArray[i] = 0.8 + Math.random() * 0.2;
+    colorArray[i+1] = 0.8 + Math.random() * 0.2;
+    colorArray[i+2] = 0.8 + Math.random() * 0.2;
+}
+
+particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+
+const particlesMaterial = new THREE.PointsMaterial({
+    size: 0.035,
+    vertexColors: true,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    color: 0xFFB6C1
+});
+
+const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+scene.add(particlesMesh);
+
+camera.position.z = 8;
+
+// 文字序列
+const words = ["祝", "廖", "盈", "盈", "万", "事", "如", "意"];
+let currentWordIndex = 0;
+let targetPositions = [];
+let isAnimating = false;
+let animationProgress = 0;
+let animationState = "aggregating";
+let allWordsComplete = false;
+
+// 创建文字形状的目标位置
+function createTextPositions(text) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = 2400;
+    canvas.height = 1200;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 800px "STXingkai", "华文行楷", "ZCOOL XiaoWei", "SimHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.fillText(text, canvas.width/2, canvas.height/2);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    const textPixels = [];
+    const step = 3;
+
+    for (let y = 0; y < canvas.height; y += step) {
+        for (let x = 0; x < canvas.width; x += step) {
+            const index = (y * canvas.width + x) * 4;
+            if (data[index + 3] > 200) {
+                textPixels.push({ x, y });
+            }
+        }
+    }
+
+    if (textPixels.length < particleCount / 2) {
+        textPixels.length = 0;
+        const fineStep = 2;
+        for (let y = 0; y < canvas.height; y += fineStep) {
+            for (let x = 0; x < canvas.width; x += fineStep) {
+                const index = (y * canvas.width + x) * 4;
+                if (data[index + 3] > 200) {
+                    textPixels.push({ x, y });
+                }
+            }
+        }
+    }
+
+    const selectedPixels = [];
+    const pixelsCopy = [...textPixels];
+
+    for (let i = 0; i < particleCount && pixelsCopy.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * pixelsCopy.length);
+        selectedPixels.push(pixelsCopy[randomIndex]);
+        pixelsCopy.splice(randomIndex, 1);
+
+        if (pixelsCopy.length === 0 && i < particleCount - 1) {
+            pixelsCopy.push(...textPixels);
+        }
+    }
+
+    const positions = [];
+    for (let i = 0; i < selectedPixels.length; i++) {
+        const pixel = selectedPixels[i];
+        const scale = 0.0055;
+        const posX = (pixel.x - canvas.width/2) * scale;
+        const posY = -(pixel.y - canvas.height/2) * scale;
+        const posZ = (Math.random() - 0.5) * 0.3;
+
+        positions.push(posX, posY, posZ);
+    }
+
+    return positions;
+}
+
+// 启动文字聚合动画
+function startTextAnimation() {
+    isAnimating = true;
+    animationState = "aggregating";
+    animationProgress = 0;
+
+    targetPositions = createTextPositions(words[currentWordIndex]);
+}
+
+// 动画函数
+function animateParticles() {
+    if (!isAnimating || allWordsComplete) return;
+
+    if (animationState === "aggregating") {
+        animationProgress += 0.025; // 稍微慢一点
+
+        if (animationProgress >= 1) {
+            animationProgress = 1;
+            animationState = "holding";
+
+            setTimeout(() => {
+                animationState = "dispersing";
+            }, 1500);
+        }
+    } else if (animationState === "dispersing") {
+        animationProgress -= 0.03; // 稍微慢一点
+
+        if (animationProgress <= 0) {
+            animationProgress = 0;
+            isAnimating = false;
+
+            currentWordIndex++;
+
+            // 检查是否所有文字都已显示完
+            if (currentWordIndex >= words.length) {
+                allWordsComplete = true;
+                // 显示最终文字
+                setTimeout(() => {
+                    document.getElementById('final-text').classList.add('show');
+                }, 500);
+            } else {
+                // 继续下一个字
+                setTimeout(startTextAnimation, 500);
+            }
+        }
+    }
+
+    const positions = particlesGeometry.attributes.position.array;
+
+    for (let i = 0; i < positions.length; i += 3) {
+        const easedProgress = easeInOutCubic(animationProgress);
+
+        positions[i] = initialPositions[i] +
+                      (targetPositions[i] - initialPositions[i]) * easedProgress;
+        positions[i+1] = initialPositions[i+1] +
+                        (targetPositions[i+1] - initialPositions[i+1]) * easedProgress;
+        positions[i+2] = initialPositions[i+2] +
+                        (targetPositions[i+2] - initialPositions[i+2]) * easedProgress;
+    }
+
+    particlesGeometry.attributes.position.needsUpdate = true;
+}
+
+// 缓动函数
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// 主动画循环
+function animate() {
+    requestAnimationFrame(animate);
+
+    // 更新粒子位置
+    animateParticles();
+
+    // 粒子微动效果（完成后持续）
+    if (allWordsComplete || (!isAnimating && animationProgress === 0)) {
+        const positions = particlesGeometry.attributes.position.array;
+        for(let i = 0; i < positions.length; i += 3) {
+            positions[i] += Math.sin(Date.now() * 0.0003 + i) * 0.002;
+            positions[i+1] += Math.cos(Date.now() * 0.0004 + i) * 0.002;
+        }
+        particlesGeometry.attributes.position.needsUpdate = true;
+    }
+
+    // 缓慢旋转整个粒子系统
+    if (!allWordsComplete) {
+        particlesMesh.rotation.z = Math.sin(Date.now() * 0.0001) * 0.02;
+    }
+
+    renderer.render(scene, camera);
+}
+animate();
+
+// 页面加载完成后开始动画
+setTimeout(startTextAnimation, 2000);
+
+// 窗口调整
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// 背景渐变
+const bgGradient = document.createElement('div');
+bgGradient.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, #FF149330, #000000);
+    pointer-events: none;
+    z-index: -1;
+`;
+document.body.appendChild(bgGradient);
+</script>
+</body>
+</html>
