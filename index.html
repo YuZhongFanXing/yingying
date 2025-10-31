@@ -29,11 +29,52 @@
         #final-text.show {
             opacity: 1;
         }
+        .blessing {
+            position: absolute;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            z-index: 20;
+            animation: float-up 8s ease-out forwards; /* 进一步延长到8秒 */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+        @keyframes float-up {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            90% {
+                opacity: 0.9; /* 在90%时仍然保持可见 */
+            }
+            100% {
+                transform: translateY(-400px) scale(0.8); /* 飘得更高 */
+                opacity: 0;
+            }
+        }
+        .firework {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            z-index: 15;
+        }
+        @keyframes firework-explode {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="final-text">祝廖盈盈万事如意</div>
+    <div id="final-text">祝廖盈盈万事如意，心想事成！</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -55,19 +96,16 @@ const initialPositions = [];
 
 // 初始化粒子位置
 for(let i = 0; i < particleCount * 3; i += 3) {
-    // 初始位置 - 随机分布在场景中
     posArray[i] = (Math.random() - 0.5) * 20;
     posArray[i+1] = (Math.random() - 0.5) * 20;
     posArray[i+2] = (Math.random() - 0.5) * 8;
-
-    // 存储初始位置
+    
     initialPositions.push(
         posArray[i],
         posArray[i+1],
         posArray[i+2]
     );
-
-    // 颜色 - 保持原来的颜色
+    
     colorArray[i] = 0.8 + Math.random() * 0.2;
     colorArray[i+1] = 0.8 + Math.random() * 0.2;
     colorArray[i+2] = 0.8 + Math.random() * 0.2;
@@ -102,25 +140,25 @@ let allWordsComplete = false;
 function createTextPositions(text) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-
+    
     canvas.width = 2400;
     canvas.height = 1200;
-
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    
     ctx.fillStyle = 'white';
     ctx.font = 'bold 800px "STXingkai", "华文行楷", "ZCOOL XiaoWei", "SimHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-
+    
     ctx.fillText(text, canvas.width/2, canvas.height/2);
-
+    
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-
+    
     const textPixels = [];
     const step = 3;
-
+    
     for (let y = 0; y < canvas.height; y += step) {
         for (let x = 0; x < canvas.width; x += step) {
             const index = (y * canvas.width + x) * 4;
@@ -129,7 +167,7 @@ function createTextPositions(text) {
             }
         }
     }
-
+    
     if (textPixels.length < particleCount / 2) {
         textPixels.length = 0;
         const fineStep = 2;
@@ -142,20 +180,20 @@ function createTextPositions(text) {
             }
         }
     }
-
+    
     const selectedPixels = [];
     const pixelsCopy = [...textPixels];
-
+    
     for (let i = 0; i < particleCount && pixelsCopy.length > 0; i++) {
         const randomIndex = Math.floor(Math.random() * pixelsCopy.length);
         selectedPixels.push(pixelsCopy[randomIndex]);
         pixelsCopy.splice(randomIndex, 1);
-
+        
         if (pixelsCopy.length === 0 && i < particleCount - 1) {
             pixelsCopy.push(...textPixels);
         }
     }
-
+    
     const positions = [];
     for (let i = 0; i < selectedPixels.length; i++) {
         const pixel = selectedPixels[i];
@@ -163,10 +201,10 @@ function createTextPositions(text) {
         const posX = (pixel.x - canvas.width/2) * scale;
         const posY = -(pixel.y - canvas.height/2) * scale;
         const posZ = (Math.random() - 0.5) * 0.3;
-
+        
         positions.push(posX, posY, posZ);
     }
-
+    
     return positions;
 }
 
@@ -175,77 +213,160 @@ function startTextAnimation() {
     isAnimating = true;
     animationState = "aggregating";
     animationProgress = 0;
-
+    
     targetPositions = createTextPositions(words[currentWordIndex]);
 }
 
-// 动画函数
+// 动画函数 - 只使用龙卷风特效
 function animateParticles() {
     if (!isAnimating || allWordsComplete) return;
-
+    
     if (animationState === "aggregating") {
-        animationProgress += 0.025; // 稍微慢一点
-
+        animationProgress += 0.012; // 更慢的聚合速度
+        
         if (animationProgress >= 1) {
             animationProgress = 1;
             animationState = "holding";
-
+            
             setTimeout(() => {
                 animationState = "dispersing";
-            }, 1500);
+            }, 1800);
         }
     } else if (animationState === "dispersing") {
-        animationProgress -= 0.03; // 稍微慢一点
-
+        animationProgress -= 0.015; // 更慢的消散速度
+        
         if (animationProgress <= 0) {
             animationProgress = 0;
             isAnimating = false;
-
+            
             currentWordIndex++;
-
-            // 检查是否所有文字都已显示完
+            
             if (currentWordIndex >= words.length) {
                 allWordsComplete = true;
-                // 显示最终文字
                 setTimeout(() => {
                     document.getElementById('final-text').classList.add('show');
+                    startFireworks();
+                    startBlessings();
                 }, 500);
             } else {
-                // 继续下一个字
-                setTimeout(startTextAnimation, 500);
+                setTimeout(startTextAnimation, 600);
             }
         }
     }
-
+    
     const positions = particlesGeometry.attributes.position.array;
-
+    
     for (let i = 0; i < positions.length; i += 3) {
-        const easedProgress = easeInOutCubic(animationProgress);
-
-        positions[i] = initialPositions[i] +
-                      (targetPositions[i] - initialPositions[i]) * easedProgress;
-        positions[i+1] = initialPositions[i+1] +
-                        (targetPositions[i+1] - initialPositions[i+1]) * easedProgress;
-        positions[i+2] = initialPositions[i+2] +
-                        (targetPositions[i+2] - initialPositions[i+2]) * easedProgress;
+        const easedProgress = easeInOutQuart(animationProgress);
+        
+        const targetX = targetPositions[i];
+        const targetY = targetPositions[i+1];
+        const targetZ = targetPositions[i+2];
+        
+        const startX = initialPositions[i];
+        const startY = initialPositions[i+1];
+        const startZ = initialPositions[i+2];
+        
+        const dx = targetX - startX;
+        const dy = targetY - startY;
+        const dz = targetZ - startZ;
+        
+        // 龙卷风特效
+        const spiralAngle = (1 - easedProgress) * Math.PI * 4 + i * 0.1;
+        const spiralRadius = Math.sqrt(dx*dx + dy*dy) * (1 - easedProgress) * 0.6;
+        const finalX = startX + dx * easedProgress + Math.cos(spiralAngle) * spiralRadius;
+        const finalY = startY + dy * easedProgress + Math.sin(spiralAngle) * spiralRadius + (1 - easedProgress) * -8;
+        const finalZ = startZ + dz * easedProgress;
+        
+        positions[i] = finalX;
+        positions[i+1] = finalY;
+        positions[i+2] = finalZ;
     }
-
+    
     particlesGeometry.attributes.position.needsUpdate = true;
 }
 
 // 缓动函数
-function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function easeInOutQuart(t) {
+    return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+}
+
+// 烟花效果
+function createFirework(x, y) {
+    const colors = ['#FF1461', '#18FF92', '#5A87FF', '#FBF38C', '#FF69B4', '#00CED1'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const particleCount = 30;
+    
+    for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'firework';
+        particle.style.background = color;
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        particle.style.boxShadow = `0 0 10px ${color}`;
+        
+        const angle = (Math.PI * 2 * i) / particleCount;
+        const velocity = 100 + Math.random() * 100;
+        const tx = Math.cos(angle) * velocity;
+        const ty = Math.sin(angle) * velocity;
+        
+        particle.style.animation = 'firework-explode 1s ease-out forwards';
+        particle.style.transform = `translate(${tx}px, ${ty}px) scale(${Math.random() + 0.5})`;
+        
+        document.body.appendChild(particle);
+        
+        setTimeout(() => particle.remove(), 1000);
+    }
+}
+
+function startFireworks() {
+    setInterval(() => {
+        const x = Math.random() * window.innerWidth;
+        const y = Math.random() * window.innerHeight * 0.7;
+        createFirework(x, y);
+    }, 800);
+}
+
+// 祝福弹幕 - 增加更多祝福语
+const blessings = [
+    '祝你万事如意', '心想事成', '笑口常开', '身体健康', '工作顺利',
+    '学业进步', '前程似锦', '财源广进', '幸福美满', '吉祥如意',
+    '平安喜乐', '事事顺心', '天天开心', '梦想成真', '好运连连',
+    '福星高照', '一帆风顺', '大展宏图', '步步高升', '生活美好',
+    '永远快乐', '健康长寿', '合家欢乐', '喜气洋洋', '锦绣前程',
+    '青春永驻', '才华横溢', '事业有成', '爱情甜蜜', '家庭和睦',
+    '岁月静好', '前程万里', '意气风发', '马到成功', '金榜题名',
+    '花开富贵', '福寿安康', '年年有余', '四季平安', '五福临门'
+];
+
+const blessingColors = [
+    '#FFE4E1', '#FFB6C1', '#FFA07A', '#98FB98', '#87CEEB',
+    '#DDA0DD', '#F0E68C', '#E0FFFF', '#FFE4B5', '#FFC0CB'
+];
+
+function createBlessing() {
+    const blessing = document.createElement('div');
+    blessing.className = 'blessing';
+    blessing.textContent = blessings[Math.floor(Math.random() * blessings.length)];
+    blessing.style.background = blessingColors[Math.floor(Math.random() * blessingColors.length)];
+    blessing.style.left = (Math.random() * (window.innerWidth - 200)) + 'px';
+    blessing.style.bottom = '0px';
+    
+    document.body.appendChild(blessing);
+    
+    setTimeout(() => blessing.remove(), 8000); // 与CSS动画时间匹配
+}
+
+function startBlessings() {
+    setInterval(createBlessing, 150); // 进一步加快出现频率
 }
 
 // 主动画循环
 function animate() {
     requestAnimationFrame(animate);
-
-    // 更新粒子位置
+    
     animateParticles();
-
-    // 粒子微动效果（完成后持续）
+    
     if (allWordsComplete || (!isAnimating && animationProgress === 0)) {
         const positions = particlesGeometry.attributes.position.array;
         for(let i = 0; i < positions.length; i += 3) {
@@ -254,27 +375,23 @@ function animate() {
         }
         particlesGeometry.attributes.position.needsUpdate = true;
     }
-
-    // 缓慢旋转整个粒子系统
+    
     if (!allWordsComplete) {
         particlesMesh.rotation.z = Math.sin(Date.now() * 0.0001) * 0.02;
     }
-
+    
     renderer.render(scene, camera);
 }
 animate();
 
-// 页面加载完成后开始动画
 setTimeout(startTextAnimation, 2000);
 
-// 窗口调整
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// 背景渐变
 const bgGradient = document.createElement('div');
 bgGradient.style.cssText = `
     position: fixed;
